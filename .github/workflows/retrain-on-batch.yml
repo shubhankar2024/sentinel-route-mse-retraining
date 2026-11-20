@@ -1,0 +1,103 @@
+
+name: SentinelRoute - Data Triggered Retraining
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/batches/**'
+
+permissions:
+  contents: read
+
+jobs:
+  retrain:
+    name: Validate Batch and Retrain
+    runs-on: ubuntu-latest
+
+    env:
+      MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+
+      - name: Identify new batch
+        id: batch
+        shell: bash
+        env:
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [[ "$BEFORE" =~ ^0+$ ]]; then
+            git ls-tree -r --name-only "$SHA" data/batches/ \
+              | grep -E '\.csv$' > /tmp/batches.txt || true
+          else
+            git diff --name-only "$BEFORE" "$SHA" -- data/batches/ \
+              | grep -E '\.csv$' > /tmp/batches.txt || true
+          fi
+
+          mapfile -t files < /tmp/batches.txt
+
+          if [ "${#files[@]}" -ne 1 ]; then
+            echo "Expected exactly one changed CSV batch."
+            echo "Found: ${#files[@]}"
+            cat /tmp/batches.txt
+            exit 1
+          fi
+
+          echo "file=${files[0]}" >> "$GITHUB_OUTPUT"
+          echo "New batch: ${files[0]}"
+
+      - name: Validate incoming batch
+        env:
+          BATCH_FILE: ${{ steps.batch.outputs.file }}
+        run: |
+          python -c "
+          import os
+          from pathlib import Path
+          from src.data_prep import prepare_and_validate_batch
+
+          batch = Path(os.environ['BATCH_FILE'])
+          cleaned = prepare_and_validate_batch(batch)
+
+          if cleaned.empty:
+              raise ValueError('Batch contains no valid rows')
+
+          output = Path('data/processed/validated_batch.csv')
+          output.parent.mkdir(parents=True, exist_ok=True)
+          cleaned.to_csv(output, index=False)
+
+          print(f'Validated {len(cleaned)} rows')
+          print(f'Saved cleaned batch to {output}')
+          "
+
+      - name: Train candidate and apply promotion gate
+        run: |
+          python -m src.train \
+            --data data/processed/validated_batch.csv \
+            --promote
+
+      - name: Upload training evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retraining-evidence
+          path: |
+            mlflow.db
+            data/eval_report.json
+            data/reference_stats.json
+          if-no-files-found: ignore
+          retention-days: 7
