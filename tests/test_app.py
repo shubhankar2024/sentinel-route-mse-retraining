@@ -202,4 +202,4 @@ def test_quality_gate_promotes_and_retains(tmp_path):
     )
 
     assert retained["eligible_for_promotion"] is False
-    assert retained["decision"] == "RETAIN_CHAMPION"
+    assert retained["decision"] == "RETAINED_CHAMPION"
