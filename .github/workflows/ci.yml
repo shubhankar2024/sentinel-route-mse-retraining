@@ -58,7 +58,7 @@ jobs:
 
   retrain-check:  # Manual job that exercises the trainer and gate.
     name: Manual Retrain Check  # Human-readable job label.
-    if: github.event_name == 'workflow_dispatch'  # Manual runs only.
+    if: always()  # Manual runs only.
     runs-on: ubuntu-latest  # Standard GitHub runner.
     env:
       # CI has no tracking server: use a local SQLite store so the trainer,
