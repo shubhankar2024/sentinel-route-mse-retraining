@@ -198,3 +198,4 @@ def test_quality_gate_promotes_and_retains(tmp_path):
         candidate_metrics={"f1_score": 0.89},
         min_f1=0.85,
         output_path=tmp_path / 
+    )
