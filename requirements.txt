@@ -9,6 +9,7 @@ pandas==2.2.3  # Telemetry table handling.
 numpy==2.1.3  # Numeric operations.
 scipy==1.14.1  # KS drift test.
 mlflow==2.17.2  # Tracking and model registry.
+sqlalchemy==2.0.36
 
 # Runtime and tests.
 requests==2.32.3  # Service-to-service calls.
