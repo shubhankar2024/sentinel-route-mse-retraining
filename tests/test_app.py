@@ -167,3 +167,34 @@ def test_target_fault_toggle():  # Fault endpoint drives healing demos.
         assert tc.post("/inject-fault").json()["fault_active"] is True  # Fault turns on.
         assert tc.get("/telemetry").status_code == 200  # Telemetry still served.
         assert tc.post("/clear-fault").json()["fault_active"] is False  # Fault turns off.
+
+from src.data_prep import prepare_and_validate_batch
+from src.quality_gate import evaluate_quality_gate
+
+
+def test_batch_validation_detects_duplicates_and_distribution(tmp_path):
+    batch_file = tmp_path / "batch.csv"
+    df = pd.DataFrame([SAMPLE_PAYLOAD, SAMPLE_PAYLOAD])
+    df["system_status"] = [0, 0]
+    df.to_csv(batch_file, index=False)
+
+    cleaned = prepare_and_validate_batch(batch_file)
+    assert len(cleaned) == 1
+    assert cleaned["system_status"].iloc[0] == 0
+
+
+def test_quality_gate_promotes_and_retains(tmp_path):
+    promoted = evaluate_quality_gate(
+        champion_metrics={"f1_score": 0.88},
+        candidate_metrics={"f1_score": 0.92},
+        min_f1=0.85,
+        output_path=tmp_path / "gate_pass.json",
+    )
+    assert promoted["eligible_for_promotion"] is True
+    assert promoted["decision"] == "ELIGIBLE_FOR_PROMOTION"
+
+    retained = evaluate_quality_gate(
+        champion_metrics={"f1_score": 0.94},
+        candidate_metrics={"f1_score": 0.89},
+        min_f1=0.85,
+        output_path=tmp_path / 
