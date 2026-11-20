@@ -190,6 +190,7 @@ def test_quality_gate_promotes_and_retains(tmp_path):
         min_f1=0.85,
         output_path=tmp_path / "gate_pass.json",
     )
+
     assert promoted["eligible_for_promotion"] is True
     assert promoted["decision"] == "ELIGIBLE_FOR_PROMOTION"
 
@@ -197,5 +198,8 @@ def test_quality_gate_promotes_and_retains(tmp_path):
         champion_metrics={"f1_score": 0.94},
         candidate_metrics={"f1_score": 0.89},
         min_f1=0.85,
-        output_path=tmp_path / 
+        output_path=tmp_path / "gate_retain.json",
     )
+
+    assert retained["eligible_for_promotion"] is False
+    assert retained["decision"] == "RETAIN_CHAMPION"
